@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.vinn.travelmanager.mapper.SpotMapper">
+
+    <resultMap id="BaseResultMap" type="com.vinn.travelmanager.entity.Spot">
+        <id column="id" property="id"/>
+        <result column="plan_id" property="planId"/>
+        <result column="day_number" property="dayNumber"/>
+        <result column="name" property="name"/>
+        <result column="location" property="location"/>
+        <result column="latitude" property="latitude"/>
+        <result column="longitude" property="longitude"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, plan_id, day_number, name, location, latitude, longitude, create_time
+    </sql>
+
+    <insert id="insert" parameterType="com.vinn.travelmanager.entity.Spot" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO spot (plan_id, day_number, name, location, latitude, longitude)
+        VALUES (#{planId}, #{dayNumber}, #{name}, #{location}, #{latitude}, #{longitude})
+    </insert>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO spot (plan_id, day_number, name, location, latitude, longitude)
+        VALUES
+        <foreach collection="spots" item="item" separator=",">
+            (#{item.planId}, #{item.dayNumber}, #{item.name}, #{item.location}, #{item.latitude}, #{item.longitude})
+        </foreach>
+    </insert>
+
+    <select id="selectByPlanId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM spot
+        WHERE plan_id = #{planId}
+        ORDER BY day_number, id
+    </select>
+
+    <select id="selectByPlanIdAndDay" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM spot
+        WHERE plan_id = #{planId} AND day_number = #{dayNumber}
+        ORDER BY id
+    </select>
+
+    <delete id="deleteByPlanId">
+        DELETE FROM spot
+        WHERE plan_id = #{planId}
+    </delete>
+
+    <delete id="deleteById">
+        DELETE FROM spot
+        WHERE id = #{id}
+    </delete>
+
+</mapper>
+

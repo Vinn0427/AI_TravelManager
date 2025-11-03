@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.vinn.travelmanager.mapper.UserPreferenceMapper">
+
+    <resultMap id="BaseResultMap" type="com.vinn.travelmanager.entity.UserPreference">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="travel_style" property="travelStyle"/>
+        <result column="budget_range" property="budgetRange"/>
+        <result column="preferred_transport" property="preferredTransport"/>
+        <result column="preferred_accommodation" property="preferredAccommodation"/>
+        <result column="dietary_preference" property="dietaryPreference"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, user_id, travel_style, budget_range, preferred_transport, preferred_accommodation,
+        dietary_preference, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.vinn.travelmanager.entity.UserPreference" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_preference (user_id, travel_style, budget_range, preferred_transport,
+        preferred_accommodation, dietary_preference)
+        VALUES (#{userId}, #{travelStyle}, #{budgetRange}, #{preferredTransport},
+        #{preferredAccommodation}, #{dietaryPreference})
+    </insert>
+
+    <update id="update" parameterType="com.vinn.travelmanager.entity.UserPreference">
+        UPDATE user_preference
+        SET
+        travel_style = #{travelStyle},
+        budget_range = #{budgetRange},
+        preferred_transport = #{preferredTransport},
+        preferred_accommodation = #{preferredAccommodation},
+        dietary_preference = #{dietaryPreference},
+        update_time = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+    </update>
+
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM user_preference
+        WHERE user_id = #{userId}
+    </select>
+
+    <delete id="deleteByUserId">
+        DELETE FROM user_preference
+        WHERE user_id = #{userId}
+    </delete>
+
+</mapper>
+

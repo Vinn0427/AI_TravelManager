@@ -7,6 +7,7 @@ import Home from '@/views/Home.vue'
 import Plan from '@/views/Plan.vue'
 import Plans from '@/views/Plans.vue'
 import Profile from '@/views/Profile.vue'
+import Map from '@/views/Map.vue'
 import { authUtils } from '@/utils/auth'
 
 const routes = [
@@ -54,6 +55,12 @@ const routes = [
         name: 'Profile',
         component: Profile,
         meta: { requiresAuth: true, title: '个人中心' }
+      },
+      {
+        path: 'map',
+        name: 'Map',
+        component: Map,
+        meta: { requiresAuth: true, title: '地图导航' }
       }
     ]
   }
