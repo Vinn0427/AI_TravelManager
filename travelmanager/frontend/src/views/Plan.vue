@@ -6,9 +6,9 @@
     </div>
 
     <el-row :gutter="20">
-      <!-- 左侧：输入表单 -->
+      <!-- 左侧：输入表单（详情模式隐藏，显示占位卡片） -->
       <el-col :xs="24" :lg="10">
-        <el-card class="form-card">
+        <el-card v-if="!isDetailMode" class="form-card">
           <template #header>
             <div class="card-header">
               <el-icon><Edit /></el-icon>
@@ -119,12 +119,26 @@
                 :loading="generating"
                 @click="handleGenerate"
                 style="width: 100%"
+                :disabled="generating"
               >
                 <el-icon><MagicStick /></el-icon>
-                {{ generating ? '正在生成行程...' : '生成智能行程' }}
+                {{ generating ? `正在生成行程...（预计需要${planForm.days * 3}-${planForm.days * 5}秒）` : '生成智能行程' }}
               </el-button>
+              <div v-if="generating" class="generating-tip">
+                <el-icon class="tip-icon"><Loading /></el-icon>
+                <span>AI正在为您规划行程，多天行程可能需要更长时间，请耐心等待...</span>
+              </div>
             </el-form-item>
           </el-form>
+        </el-card>
+        <el-card v-else class="form-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><Document /></el-icon>
+              <span>行程信息</span>
+            </div>
+          </template>
+          <el-empty description="行程详情模式，仅展示右侧预览" />
         </el-card>
       </el-col>
 
@@ -173,7 +187,7 @@
 
                   <el-divider />
                   
-                  <!-- 每日行程 -->
+                  <!-- 每日行程和路线指引 -->
                   <div class="result-details">
                     <h3 class="section-title">每日行程</h3>
                     <div v-for="(day, index) in planResult.schedule" :key="index" class="day-schedule">
@@ -190,9 +204,34 @@
                     </div>
                   </div>
 
-                  <el-divider />
+                  <!-- 每日路线指引 -->
+                  <div v-if="sortedDailyGuides && sortedDailyGuides.length > 0" class="daily-guides-section">
+                    <el-divider />
+                    <h3 class="section-title">
+                      <el-icon><Guide /></el-icon>
+                      每日路线指引
+                    </h3>
+                    <div v-for="guide in sortedDailyGuides" :key="guide.dayNumber" class="guide-card">
+                      <div class="guide-header">
+                        <h4 class="guide-day-title">
+                          <el-icon><Calendar /></el-icon>
+                          第 {{ guide.dayNumber }} 天路线指引
+                        </h4>
+                      </div>
+                      <div class="guide-content">
+                        <div class="guide-text">{{ guide.guide }}</div>
+                      </div>
+                    </div>
+                  </div>
                   
-                  <el-button type="primary" style="width: 100%; margin-top: 20px;" @click="savePlan">
+                  <!-- 调试信息（开发时可用） -->
+                  <div v-if="planResult && !sortedDailyGuides.length && planResult.dailyGuides" style="padding: 10px; background: #fff3cd; border-radius: 4px; margin-top: 10px;">
+                    <small>调试：dailyGuides数据存在但未显示，数据：{{ JSON.stringify(planResult.dailyGuides) }}</small>
+                  </div>
+
+                  <el-divider v-if="!isDetailMode" />
+                  
+                  <el-button v-if="!isDetailMode" type="primary" style="width: 100%; margin-top: 20px;" @click="savePlan">
                     保存行程到数据库
                   </el-button>
                 </div>
@@ -206,8 +245,9 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRoute } from 'vue-router'
 import {
   Location,
   Edit,
@@ -218,16 +258,76 @@ import {
   Calendar,
   Van,
   House,
-  Timer
+  Timer,
+  Loading
 } from '@element-plus/icons-vue'
 import { aiApi } from '@/api/ai'
 import { planApi } from '@/api/plan'
+import { SpeechRecognitionUtil } from '@/utils/speechRecognition'
+import { preferenceApi } from '@/api/preference'
 
+const route = useRoute()
 const planFormRef = ref(null)
 const generating = ref(false)
 const recording = ref(false)
+let speechUtil = null
 const planResult = ref(null)
 const planData = ref(null) // 保存从AI获取的完整数据用于保存
+const isDetailMode = computed(() => !!route.params.id)
+// 若存在路由参数 planId，则加载详情并展示
+onMounted(async () => {
+  const id = route.params.id
+  if (id) {
+    try {
+      generating.value = true
+      const res = await planApi.getPlanById(id)
+      if (res.code === 200 && res.data) {
+        // 将后端 PlanDetailDTO 映射为前端展示结构
+        const detail = res.data
+        planData.value = {
+          destination: detail.destination,
+          startDate: detail.startDate,
+          endDate: detail.endDate,
+          totalDays: detail.totalDays,
+          budget: detail.budget,
+          spots: (detail.spots || []).map(s => ({
+            dayNumber: s.dayNumber,
+            name: s.name,
+            location: s.location,
+            latitude: s.latitude,
+            longitude: s.longitude
+          })),
+          budgets: (detail.budgets || []).map(b => ({
+            category: b.category,
+            amount: b.amount
+          })),
+          dailyGuides: (detail.dailyGuides || []).map(g => ({
+            dayNumber: g.dayNumber,
+            guide: g.guideText
+          }))
+        }
+        planResult.value = formatPlanForDisplay(planData.value)
+      } else {
+        ElMessage.error(res.message || '获取行程详情失败')
+      }
+    } catch (e) {
+      console.error(e)
+      ElMessage.error('获取行程详情失败')
+    } finally {
+      generating.value = false
+    }
+  } else {
+    // 非详情模式：加载用户偏好作为默认输入
+    try {
+      const prefRes = await preferenceApi.get()
+      if (prefRes.code === 200 && prefRes.data) {
+        const labels = ['美食','购物','文化','自然','历史','娱乐']
+        const text = [prefRes.data.travelStyle].filter(Boolean).join('、')
+        planForm.preferences = labels.filter(l => text.includes(l))
+      }
+    } catch {}
+  }
+})
 
 const planForm = reactive({
   destination: '',
@@ -281,8 +381,38 @@ const handleGenerate = async () => {
           // 保存完整的计划数据（用于后续保存到数据库）
           planData.value = response.data
           
+          // 调试：打印接收到的完整响应
+          console.log('=== 完整响应对象 ===')
+          console.log('response:', response)
+          console.log('response.code:', response.code)
+          console.log('response.data:', response.data)
+          console.log('response.data类型:', typeof response.data)
+          console.log('response.data.dailyGuides:', response.data.dailyGuides)
+          console.log('response.data.dailyGuides类型:', typeof response.data.dailyGuides)
+          console.log('response.data.dailyGuides是否为数组:', Array.isArray(response.data.dailyGuides))
+          if (response.data.dailyGuides) {
+            console.log('dailyGuides长度:', response.data.dailyGuides.length)
+            console.log('dailyGuides内容:', JSON.stringify(response.data.dailyGuides, null, 2))
+          }
+          
           // 格式化数据用于前端展示
           planResult.value = formatPlanForDisplay(response.data)
+          
+          // 调试：打印格式化后的数据
+          console.log('=== 格式化后的数据 ===')
+          console.log('planResult.value:', planResult.value)
+          console.log('planResult.value.dailyGuides:', planResult.value.dailyGuides)
+          console.log('planResult.value.dailyGuides类型:', typeof planResult.value.dailyGuides)
+          console.log('planResult.value.dailyGuides是否为数组:', Array.isArray(planResult.value.dailyGuides))
+          if (planResult.value.dailyGuides) {
+            console.log('格式化后dailyGuides长度:', planResult.value.dailyGuides.length)
+            console.log('格式化后dailyGuides内容:', JSON.stringify(planResult.value.dailyGuides, null, 2))
+          }
+          
+          // 检查计算属性
+          console.log('=== 计算属性检查 ===')
+          console.log('sortedDailyGuides值:', sortedDailyGuides.value)
+          console.log('sortedDailyGuides长度:', sortedDailyGuides.value.length)
           
           ElMessage.success('AI行程生成成功！')
         } else {
@@ -319,6 +449,16 @@ const formatPlanForDisplay = (planData) => {
     schedule.push(scheduleByDay[i] || [`第${i}天的行程安排`])
   }
 
+  // 确保 dailyGuides 是数组格式
+  let dailyGuides = []
+  if (planData.dailyGuides) {
+    if (Array.isArray(planData.dailyGuides)) {
+      dailyGuides = planData.dailyGuides
+    } else {
+      console.warn('dailyGuides 不是数组格式:', planData.dailyGuides)
+    }
+  }
+
   return {
     title: `${planData.destination} ${planData.totalDays}天${planForm.people}人游`,
     destination: planData.destination,
@@ -326,31 +466,64 @@ const formatPlanForDisplay = (planData) => {
     budget: planData.budget,
     schedule: schedule,
     spots: planData.spots || [],
-    budgets: planData.budgets || []
+    budgets: planData.budgets || [],
+    dailyGuides: dailyGuides
   }
 }
 
-// 语音输入处理
-const handleVoiceInput = () => {
-  if (recording.value) {
-    // 停止录音
-    recording.value = false
-    ElMessage.info('录音已停止')
-    // TODO: 处理语音识别结果，填充到目的地
-  } else {
+// 计算属性：按天数排序的路线指引
+const sortedDailyGuides = computed(() => {
+  if (!planResult.value) {
+    return []
+  }
+  
+  const guides = planResult.value.dailyGuides
+  if (!guides || !Array.isArray(guides) || guides.length === 0) {
+    return []
+  }
+  
+  // 过滤掉无效数据并排序
+  const validGuides = guides.filter(guide => guide && guide.dayNumber && guide.guide)
+  if (validGuides.length === 0) {
+    return []
+  }
+  
+  return [...validGuides].sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))
+})
+
+// 语音输入处理（Web Speech API）
+const handleVoiceInput = async () => {
+  try {
+    // 检查浏览器支持
+    if (!SpeechRecognitionUtil.isSupported()) {
+      ElMessage.error('当前浏览器不支持语音输入，请使用 Chrome/Edge 等现代浏览器')
+      return
+    }
+
+    // 已在录音：停止
+    if (recording.value) {
+      if (speechUtil) speechUtil.stop()
+      recording.value = false
+      ElMessage.info('录音已停止')
+      return
+    }
+
     // 开始录音
+    if (!speechUtil) speechUtil = new SpeechRecognitionUtil()
     recording.value = true
-    ElMessage.info('开始录音，请说出目的地...')
-    // TODO: 集成语音识别API（如科大讯飞等）
-    // 模拟语音识别结果（3秒后自动填充）
-    setTimeout(() => {
-      if (recording.value) {
-        // 模拟识别结果
-        planForm.destination = '北京'
-        recording.value = false
-        ElMessage.success('已识别目的地：北京')
-      }
-    }, 3000)
+    ElMessage.info('开始录音，请清晰说出目的地...')
+
+    const text = await speechUtil.start()
+    if (text) {
+      planForm.destination = text
+      ElMessage.success(`已识别目的地：${text}`)
+    } else {
+      ElMessage.warning('未识别到有效内容，请重试')
+    }
+  } catch (err) {
+    ElMessage.error(err.message || '语音识别失败，请重试')
+  } finally {
+    recording.value = false
   }
 }
 
@@ -370,7 +543,12 @@ const savePlan = async () => {
       totalDays: planData.value.totalDays,
       budget: planData.value.budget,
       spots: planData.value.spots || [],
-      budgets: planData.value.budgets || []
+      budgets: planData.value.budgets || [],
+      dailyGuides: Array.isArray(planData.value.dailyGuides)
+        ? planData.value.dailyGuides
+            .filter(g => g && g.dayNumber && g.guide)
+            .map(g => ({ dayNumber: g.dayNumber, guide: g.guide }))
+        : []
     }
 
     const response = await planApi.savePlan(saveData)
@@ -568,5 +746,77 @@ const savePlan = async () => {
   margin-top: 4px;
   flex-shrink: 0;
 }
+
+.daily-guides-section {
+  margin-top: 20px;
+}
+
+.guide-card {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #409eff;
+}
+
+.guide-header {
+  margin-bottom: 12px;
+}
+
+.guide-day-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0;
+}
+
+.guide-content {
+  background: white;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.guide-text {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #606266;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.generating-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  border: 1px solid #b3d8ff;
+  color: #409eff;
+  font-size: 14px;
+}
+
+.tip-icon {
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>
+
 

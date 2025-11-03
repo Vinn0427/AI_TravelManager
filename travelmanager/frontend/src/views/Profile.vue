@@ -136,6 +136,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { User, Document, Calendar } from '@element-plus/icons-vue'
 import { authUtils } from '@/utils/auth'
+import { preferenceApi } from '@/api/preference'
 
 const activeTab = ref('basic')
 const basicFormRef = ref(null)
@@ -196,8 +197,16 @@ const passwordRules = {
   ]
 }
 
-onMounted(() => {
+onMounted(async () => {
   // TODO: 从API获取用户统计信息
+  try {
+    const res = await preferenceApi.get()
+    if (res.code === 200 && res.data) {
+      const labels = ['美食','购物','文化','自然','历史','娱乐']
+      const text = [res.data.travelStyle].filter(Boolean).join('、')
+      preferencesForm.preferences = labels.filter(l => text.includes(l))
+    }
+  } catch {}
 })
 
 const handleUpdateBasic = async () => {
@@ -237,9 +246,18 @@ const handleResetPassword = () => {
   passwordForm.confirmPassword = ''
 }
 
-const handleSavePreferences = () => {
-  // TODO: 保存偏好设置
-  ElMessage.success('偏好设置已保存')
+const handleSavePreferences = async () => {
+  try {
+    const travelStyle = (preferencesForm.preferences || []).join('、')
+    const res = await preferenceApi.save({ travelStyle })
+    if (res.code === 200) {
+      ElMessage.success('偏好设置已保存')
+    } else {
+      ElMessage.error(res.message || '保存失败')
+    }
+  } catch (e) {
+    ElMessage.error('保存失败')
+  }
 }
 </script>
 
