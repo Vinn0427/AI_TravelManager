@@ -1,12 +1,12 @@
 <template>
   <div class="map-container">
     <div class="map-header">
-      <h1 class="page-title">地图导航</h1>
-      <p class="page-subtitle">查看目的地位置和路线规划</p>
+      <h1 class="page-title">地图展示</h1>
+      <p class="page-subtitle">搜索地点并在地图上展示</p>
     </div>
 
     <el-row :gutter="20">
-      <!-- 左侧：搜索和控制面板 -->
+      <!-- 左侧：搜索面板 -->
       <el-col :xs="24" :md="6">
         <el-card class="control-card">
           <template #header>
@@ -17,7 +17,7 @@
           </template>
 
           <el-form :model="searchForm" label-position="top">
-            <el-form-item label="目的地">
+            <el-form-item label="搜索地点：">
               <el-input
                 v-model="searchForm.destination"
                 placeholder="输入城市或景点名称"
@@ -49,33 +49,6 @@
               </el-button>
             </el-form-item>
           </el-form>
-
-          <el-divider />
-
-          <div class="map-controls">
-            <h3>地图控制</h3>
-            <el-button-group style="width: 100%">
-              <el-button :icon="ZoomIn" @click="handleZoomIn">放大</el-button>
-              <el-button :icon="ZoomOut" @click="handleZoomOut">缩小</el-button>
-            </el-button-group>
-            <el-button
-              type="primary"
-              style="width: 100%; margin-top: 10px"
-              :icon="Aim"
-              @click="handleLocate"
-            >
-              定位到当前位置
-            </el-button>
-          </div>
-
-          <el-divider />
-
-          <div class="location-info" v-if="currentLocation">
-            <h3>当前位置</h3>
-            <p><strong>经度:</strong> {{ currentLocation.lng }}</p>
-            <p><strong>纬度:</strong> {{ currentLocation.lat }}</p>
-            <p><strong>地址:</strong> {{ currentLocation.address || '正在获取...' }}</p>
-          </div>
         </el-card>
       </el-col>
 
@@ -86,15 +59,6 @@
             <div class="card-header">
               <el-icon><MapLocation /></el-icon>
               <span>地图视图</span>
-              <div style="margin-left: auto; display: flex; gap: 10px;">
-                <el-button
-                  :icon="FullScreen"
-                  circle
-                  text
-                  @click="handleFullScreen"
-                  title="全屏"
-                />
-              </div>
             </div>
           </template>
 
@@ -122,10 +86,8 @@
             >
               <template #default>
                 <ul class="tips-list">
-                  <li>支持搜索目的地并在地图上标记</li>
-                  <li>支持路线规划功能</li>
-                  <li>支持实时位置定位</li>
-                  <li>支持地图缩放和拖拽操作</li>
+                  <li>支持搜索地点并在地图上标记显示</li>
+                  <li>支持地图缩放与拖拽展示</li>
                 </ul>
               </template>
             </el-alert>
@@ -142,19 +104,15 @@ import { ElMessage } from 'element-plus'
 import {
   Location,
   MapLocation,
-  Search,
-  ZoomIn,
-  ZoomOut,
-  Aim,
-  FullScreen
+  Search
 } from '@element-plus/icons-vue'
 
 const searchForm = reactive({
   destination: ''
 })
 
-const currentLocation = ref(null)
 const mapInstance = ref(null)
+let searchMarker = null
 const mapZoom = ref(13)
 
 // 搜索目的地
@@ -164,19 +122,34 @@ const handleSearch = () => {
     return
   }
 
+  if (!mapInstance.value) {
+    ElMessage.error('地图尚未初始化，请稍后再试')
+    return
+  }
+
   AMap.plugin('AMap.Geocoder', () => {
     const geocoder = new AMap.Geocoder()
     geocoder.getLocation(searchForm.destination, (status, result) => {
       if (status === 'complete' && result.geocodes.length) {
         const location = result.geocodes[0].location
-        mapInstance.value.setCenter(location)
         mapInstance.value.setZoom(15)
+        mapInstance.value.setCenter(location)
 
-        new AMap.Marker({
+        // 清除上一标记
+        if (searchMarker) {
+          searchMarker.setMap(null)
+          searchMarker = null
+        }
+
+        // 添加新标记
+        searchMarker = new AMap.Marker({
           map: mapInstance.value,
           position: location,
           title: searchForm.destination,
         })
+
+        // 调整视野以确保标记可见
+        mapInstance.value.setFitView([searchMarker])
 
         ElMessage.success(`已定位到：${searchForm.destination}`)
       } else {
@@ -187,58 +160,7 @@ const handleSearch = () => {
 }
 
 
-// 地图缩放
-const handleZoomIn = () => {
-  mapZoom.value = Math.min(mapZoom.value + 1, 18)
-  mapInstance.value.setZoom(mapZoom.value)
-}
-
-const handleZoomOut = () => {
-  mapZoom.value = Math.max(mapZoom.value - 1, 3)
-  mapInstance.value.setZoom(mapZoom.value)
-}
-
-
-// 定位当前位置
-const handleLocate = () => {
-  ElMessage.info('正在定位中...')
-
-  AMap.plugin('AMap.Geolocation', () => {
-    const geolocation = new AMap.Geolocation({
-      enableHighAccuracy: true,
-      timeout: 10000,
-      position: 'RB',
-    })
-    mapInstance.value.addControl(geolocation)
-    geolocation.getCurrentPosition((status, result) => {
-      if (status === 'complete' && result.position) {
-        const { lng, lat } = result.position
-        currentLocation.value = {
-          lng,
-          lat,
-          address: result.formattedAddress || '未知位置',
-        }
-        mapInstance.value.setCenter([lng, lat])
-        ElMessage.success('定位成功')
-      } else {
-        ElMessage.error('定位失败，请检查浏览器定位权限')
-      }
-    })
-  })
-}
-
-
-// 全屏显示
-const handleFullScreen = () => {
-  const container = document.getElementById('amap-container')
-  if (!document.fullscreenElement) {
-    container.requestFullscreen().catch(err => {
-      ElMessage.warning('无法进入全屏模式')
-    })
-  } else {
-    document.exitFullscreen()
-  }
-}
+// 去除定位/全屏等功能，仅保留搜索显示
 
 // 初始化地图
 const initMap = () => {
