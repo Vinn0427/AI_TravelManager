@@ -25,10 +25,14 @@
             <el-icon><Document /></el-icon>
             <span>我的行程</span>
           </el-menu-item>
-          <el-menu-item index="/map">
-            <el-icon><MapLocation /></el-icon>
-            <span>地图导航</span>
-          </el-menu-item>
+        <el-menu-item index="/map">
+          <el-icon><MapLocation /></el-icon>
+          <span>地图展示</span>
+        </el-menu-item>
+        <el-menu-item index="/budget">
+          <el-icon><Document /></el-icon>
+          <span>预算分析</span>
+        </el-menu-item>
         </el-menu>
         <el-dropdown @command="handleCommand">
           <span class="user-dropdown">

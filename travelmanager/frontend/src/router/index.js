@@ -8,6 +8,7 @@ import Plan from '@/views/Plan.vue'
 import Plans from '@/views/Plans.vue'
 import Profile from '@/views/Profile.vue'
 import Map from '@/views/Map.vue'
+import BudgetAnalysis from '@/views/BudgetAnalysis.vue'
 import { authUtils } from '@/utils/auth'
 
 const routes = [
@@ -45,10 +46,22 @@ const routes = [
         meta: { requiresAuth: true, title: '旅行规划' }
       },
       {
+        path: 'plan/:id',
+        name: 'PlanDetail',
+        component: Plan,
+        meta: { requiresAuth: true, title: '旅行规划详情' }
+      },
+      {
         path: 'plans',
         name: 'Plans',
         component: Plans,
         meta: { requiresAuth: true, title: '我的行程' }
+      },
+      {
+        path: 'budget',
+        name: 'BudgetAnalysis',
+        component: BudgetAnalysis,
+        meta: { requiresAuth: true, title: '预算分析' }
       },
       {
         path: 'profile',
@@ -60,7 +73,7 @@ const routes = [
         path: 'map',
         name: 'Map',
         component: Map,
-        meta: { requiresAuth: true, title: '地图导航' }
+        meta: { requiresAuth: true, title: '地图展示' }
       }
     ]
   }

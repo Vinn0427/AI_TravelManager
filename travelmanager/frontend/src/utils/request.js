@@ -5,7 +5,7 @@ import router from '@/router'
 // 创建axios实例
 const service = axios.create({
   baseURL: '/api',
-  timeout: 30000
+  timeout: 60000  // 增加到60秒，避免AI生成多天行程时超时
 })
 
 // 请求拦截器
@@ -65,11 +65,17 @@ service.interceptors.response.use(
         case 500:
           ElMessage.error('服务器错误')
           break
+        case 504:
+          ElMessage.error('网关超时，AI生成多天行程可能需要更长时间，请稍后重试或减少天数')
+          break
         default:
           ElMessage.error(`连接错误: ${error.response.status}`)
       }
+    } else if (error.code === 'ECONNABORTED' || (error.message && error.message.includes('timeout'))) {
+      // 超时错误，提供更友好的提示
+      ElMessage.error('请求超时，AI生成多天行程可能需要更长时间，请稍后重试或减少天数')
     } else {
-      ElMessage.error('网络连接失败')
+      ElMessage.error('网络连接失败，请检查网络后重试')
     }
     
     return Promise.reject(error)

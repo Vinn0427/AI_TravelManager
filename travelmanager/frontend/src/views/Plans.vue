@@ -14,9 +14,9 @@
         <el-form-item label="状态">
           <el-select v-model="filterForm.status" placeholder="全部" clearable style="width: 150px">
             <el-option label="全部" value="" />
+            <el-option label="计划中" value="计划中" />
             <el-option label="进行中" value="进行中" />
             <el-option label="已完成" value="已完成" />
-            <el-option label="已取消" value="已取消" />
           </el-select>
         </el-form-item>
         <el-form-item label="目的地">
@@ -30,13 +30,19 @@
     </el-card>
 
     <!-- 行程列表 -->
-    <el-empty v-if="plans.length === 0" description="暂无行程，快去创建您的第一个旅行计划吧！">
-      <el-button type="primary" @click="goToPlan">创建行程</el-button>
-    </el-empty>
+    <div v-loading="loading" element-loading-text="加载中...">
+      <template v-if="!loading">
+        <el-empty v-if="filteredPlans.length === 0 && plans.length === 0" description="暂无行程，快去创建您的第一个旅行计划吧！">
+          <el-button type="primary" @click="goToPlan">创建行程</el-button>
+        </el-empty>
 
-    <el-row v-else :gutter="20">
+        <el-empty v-else-if="filteredPlans.length === 0 && plans.length > 0" description="没有找到符合条件的行程">
+          <el-button @click="handleReset">重置筛选</el-button>
+        </el-empty>
+
+        <el-row v-else :gutter="20">
       <el-col
-        v-for="plan in plans"
+        v-for="plan in filteredPlans"
         :key="plan.id"
         :xs="24"
         :sm="12"
@@ -49,16 +55,16 @@
           </div>
           <div class="plan-content">
             <div class="plan-header">
-              <h3>{{ plan.title }}</h3>
+              <h3>{{ getPlanTitle(plan) }}</h3>
               <el-tag :type="getStatusType(plan.status)" size="small">
                 {{ plan.status }}
               </el-tag>
             </div>
             <div class="plan-info">
               <p><el-icon><Location /></el-icon> {{ plan.destination }}</p>
-              <p><el-icon><Calendar /></el-icon> {{ plan.startDate }} - {{ plan.endDate }}</p>
-              <p><el-icon><Timer /></el-icon> {{ plan.days }} 天</p>
-              <p><el-icon><Money /></el-icon> 预算: ¥{{ plan.budget }}</p>
+              <p><el-icon><Calendar /></el-icon> {{ plan.startDateFormatted }} - {{ plan.endDateFormatted }}</p>
+              <p><el-icon><Timer /></el-icon> {{ plan.totalDays }} 天</p>
+              <p><el-icon><Money /></el-icon> 预算: ¥{{ plan.budgetFormatted }}</p>
             </div>
             <div class="plan-footer">
               <el-button text type="primary" @click="viewPlan(plan.id)">查看详情</el-button>
@@ -67,7 +73,9 @@
           </div>
         </el-card>
       </el-col>
-    </el-row>
+        </el-row>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -83,6 +91,7 @@ import {
   MapLocation,
   Plus
 } from '@element-plus/icons-vue'
+import { planApi } from '@/api/plan'
 
 const router = useRouter()
 const filterForm = reactive({
@@ -91,11 +100,106 @@ const filterForm = reactive({
 })
 
 const plans = ref([])
+const loading = ref(false)
 
-// 获取行程列表（模拟数据）
+// 获取行程列表
+const loadPlans = async () => {
+  loading.value = true
+  try {
+    const res = await planApi.getPlans()
+    if (res.code === 200 && res.data) {
+      // 处理数据，添加计算字段
+      plans.value = res.data.map(plan => {
+        return {
+          ...plan,
+          // 格式化日期
+          startDateFormatted: formatDate(plan.startDate),
+          endDateFormatted: formatDate(plan.endDate),
+          // 计算状态
+          status: calculateStatus(plan.startDate, plan.endDate),
+          // 格式化预算
+          budgetFormatted: formatBudget(plan.budget)
+        }
+      })
+      
+      // 应用筛选
+      applyFilter()
+    } else {
+      ElMessage.error(res.message || '获取行程列表失败')
+      plans.value = []
+    }
+  } catch (error) {
+    console.error('获取行程列表失败:', error)
+    ElMessage.error('获取行程列表失败')
+    plans.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+// 格式化日期
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// 格式化预算
+const formatBudget = (budget) => {
+  if (!budget) return '0.00'
+  return parseFloat(budget).toFixed(2)
+}
+
+// 计算状态：根据日期判断行程状态
+const calculateStatus = (startDate, endDate) => {
+  if (!startDate || !endDate) return '计划中'
+  
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const start = new Date(startDate)
+  start.setHours(0, 0, 0, 0)
+  
+  const end = new Date(endDate)
+  end.setHours(0, 0, 0, 0)
+  
+  if (today < start) {
+    return '计划中'
+  } else if (today >= start && today <= end) {
+    return '进行中'
+  } else {
+    return '已完成'
+  }
+}
+
+// 应用筛选
+const filteredPlans = ref([])
+
+const applyFilter = () => {
+  let result = [...plans.value]
+  
+  // 按状态筛选
+  if (filterForm.status) {
+    result = result.filter(plan => plan.status === filterForm.status)
+  }
+  
+  // 按目的地筛选
+  if (filterForm.destination) {
+    const keyword = filterForm.destination.toLowerCase()
+    result = result.filter(plan => 
+      plan.destination && plan.destination.toLowerCase().includes(keyword)
+    )
+  }
+  
+  filteredPlans.value = result
+}
+
+// 初始化加载
 onMounted(() => {
-  // TODO: 从API获取真实数据
-  plans.value = []
+  loadPlans()
 })
 
 const goToPlan = () => {
@@ -103,40 +207,56 @@ const goToPlan = () => {
 }
 
 const handleFilter = () => {
-  // TODO: 实现筛选逻辑
-  ElMessage.info('筛选功能开发中...')
+  applyFilter()
 }
 
 const handleReset = () => {
   filterForm.status = ''
   filterForm.destination = ''
-  handleFilter()
+  applyFilter()
 }
 
 const viewPlan = (id) => {
-  router.push(`/plans/${id}`)
+  router.push(`/plan/${id}`)
 }
 
-const deletePlan = (id) => {
-  ElMessageBox.confirm('确定要删除这个行程吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // TODO: 调用删除API
-    ElMessage.success('删除成功')
-  }).catch(() => {
-    // 取消操作
-  })
+const deletePlan = async (id) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个行程吗？删除后不可恢复！', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    // 调用删除API
+    const res = await planApi.deletePlan(id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      // 重新加载列表
+      loadPlans()
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除行程失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 const getStatusType = (status) => {
   const statusMap = {
+    '计划中': 'info',
     '进行中': 'primary',
-    '已完成': 'success',
-    '已取消': 'info'
+    '已完成': 'success'
   }
   return statusMap[status] || 'info'
+}
+
+// 生成标题（使用目的地和日期范围）
+const getPlanTitle = (plan) => {
+  return `${plan.destination} - ${plan.startDateFormatted}`
 }
 </script>
 

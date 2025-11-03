@@ -47,5 +47,5 @@ ai:
   dashscope:
     api-key: ${DASHSCOPE_API_KEY}  # 从环境变量读取，或直接配置
     base-url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
-    model: qwen-plus  # 可选：qwen-turbo, qwen-plus, qwen-max
+    model: qwen-plus  # 使用最快的模型：qwen-turbo（响应最快）| qwen-plus（平衡）| qwen-max（最强）
 
