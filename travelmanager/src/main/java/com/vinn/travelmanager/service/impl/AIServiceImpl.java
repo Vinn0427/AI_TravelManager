@@ -36,8 +36,33 @@ public class AIServiceImpl implements AIService {
     @Value("${ai.dashscope.model:qwen-turbo}")
     private String model;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    
+    // 配置RestTemplate的超时设置
+    public AIServiceImpl() {
+        this.restTemplate = createRestTemplate();
+    }
+    
+    /**
+     * 创建配置了超时的RestTemplate
+     */
+    private RestTemplate createRestTemplate() {
+        RestTemplate template = new RestTemplate();
+        
+        // 使用Spring内置的SimpleClientHttpRequestFactory配置超时
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = 
+            new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        
+        // 连接超时时间（建立连接的时间）：10秒
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(10));
+        
+        // 读取超时时间（等待响应的时间）：60秒（AI生成可能需要较长时间）
+        factory.setReadTimeout(java.time.Duration.ofSeconds(60));
+        
+        template.setRequestFactory(factory);
+        return template;
+    }
 
     @Override
     public PlanSaveDTO generateTravelPlan(AIGenerateRequestDTO request) {
@@ -55,6 +80,18 @@ public class AIServiceImpl implements AIService {
         } catch (Exception e) {
             logger.error("生成旅行计划失败", e);
             throw new RuntimeException("AI生成旅行计划失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public String analyzeBudget(String prompt) {
+        try {
+            String content = callDashScopeAPI(prompt);
+            // 预算分析返回为自然语言文本，直接返回
+            return content;
+        } catch (Exception e) {
+            logger.error("预算分析失败", e);
+            throw new RuntimeException("AI预算分析失败: " + e.getMessage(), e);
         }
     }
 
@@ -117,9 +154,25 @@ public class AIServiceImpl implements AIService {
         prompt.append("      \"category\": \"购物\",\n");
         prompt.append("      \"amount\": 预算金额（数字）\n");
         prompt.append("    }\n");
+        prompt.append("  ],\n");
+        prompt.append("  \"dailyGuides\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"dayNumber\": 1,\n");
+        prompt.append("      \"guide\": \"第1天的详细路线指引文本。必须包含：1）交通方式推荐（如何到达景点、推荐交通路线）2）住宿推荐（推荐的酒店/民宿名称、位置、价格区间）3）景点游览路线（按时间顺序的景点推荐，包括景点名称、游览时间、门票信息）4）餐厅推荐（早餐、午餐、晚餐推荐，包括餐厅名称、特色菜、人均消费）。根据预算合理安排，确保内容详细实用。\"\n");
+        prompt.append("    }\n");
         prompt.append("  ]\n");
         prompt.append("}\n");
-        prompt.append("\n重要：请确保预算总和不超过总预算。每个景点必须包含dayNumber字段（1到").append(request.getDays()).append("）。");
+        prompt.append("\n【重要要求，必须严格遵守】：\n");
+        prompt.append("1. 请确保预算总和不超过总预算。每个景点必须包含dayNumber字段（1到").append(request.getDays()).append("）。\n");
+        prompt.append("2. 【必需】dailyGuides数组是必需字段，绝对不能省略！必须包含每一天（1到").append(request.getDays()).append("天）的路线指引。即使只有1天行程，也要生成dailyGuides数组。\n");
+        prompt.append("3. 每天的guide字段必须是一段详细的文字描述（至少200字），必须包含以下四个部分：\n");
+        prompt.append("   a) 交通方式：推荐当天的交通路线和方式（如：地铁、公交、出租车、步行等），包括具体的路线指引和预计时间\n");
+        prompt.append("   b) 住宿推荐：推荐的住宿地点（如果是多天行程，第一天需推荐，后续几天说明是否需要更换住宿），包括酒店/民宿名称、位置、价格区间、预订建议\n");
+        prompt.append("   c) 景点游览：按时间顺序列出当天推荐的景点，包括景点名称、最佳游览时间、门票价格或免费信息、游览时长、特色亮点、注意事项\n");
+        prompt.append("   d) 餐厅推荐：推荐当天的早餐、午餐、晚餐餐厅，包括餐厅名称、推荐菜品、人均消费、位置信息、营业时间\n");
+        prompt.append("4. 所有推荐必须考虑预算限制，提供性价比高的选择。\n");
+        prompt.append("5. guide字段使用中文，语言自然流畅，便于用户阅读和理解。使用段落分隔，每个部分之间用换行分隔。\n");
+        prompt.append("6. 【再次强调】JSON中必须包含dailyGuides字段，且数组长度必须等于旅行天数。如果不包含dailyGuides字段，生成的计划将无法使用！");
 
         return prompt.toString();
     }
@@ -210,6 +263,10 @@ public class AIServiceImpl implements AIService {
      */
     private PlanSaveDTO parseAIResponse(String aiResponse, AIGenerateRequestDTO request) {
         try {
+            // 记录AI返回的原始JSON（用于调试）
+            logger.info("AI返回的原始JSON（前500字符）: {}", 
+                aiResponse.length() > 500 ? aiResponse.substring(0, 500) : aiResponse);
+            
             // 解析JSON
             JsonNode rootNode = objectMapper.readTree(aiResponse);
 
@@ -265,9 +322,46 @@ public class AIServiceImpl implements AIService {
             }
             planDTO.setBudgets(budgets);
 
+            // 解析每日路线指引
+            JsonNode dailyGuidesNode = rootNode.path("dailyGuides");
+            List<PlanSaveDTO.DailyGuideDTO> dailyGuides = new ArrayList<>();
+            
+            logger.info("检查dailyGuides字段是否存在: {}", rootNode.has("dailyGuides"));
+            
+            if (dailyGuidesNode != null && !dailyGuidesNode.isMissingNode()) {
+                logger.info("dailyGuidesNode类型: {}, 是否为数组: {}", 
+                    dailyGuidesNode.getNodeType(), dailyGuidesNode.isArray());
+                
+                if (dailyGuidesNode.isArray()) {
+                    logger.info("dailyGuides数组大小: {}", dailyGuidesNode.size());
+                    for (JsonNode guideNode : dailyGuidesNode) {
+                        PlanSaveDTO.DailyGuideDTO guideDTO = new PlanSaveDTO.DailyGuideDTO();
+                        int dayNumber = guideNode.path("dayNumber").asInt(0);
+                        String guide = guideNode.path("guide").asText("");
+                        
+                        logger.info("解析路线指引 - 第{}天, 内容长度: {}", dayNumber, guide.length());
+                        
+                        if (dayNumber > 0 && !guide.isEmpty()) {
+                            guideDTO.setDayNumber(dayNumber);
+                            guideDTO.setGuide(guide);
+                            dailyGuides.add(guideDTO);
+                        } else {
+                            logger.warn("跳过无效的路线指引 - dayNumber: {}, guide长度: {}", dayNumber, guide.length());
+                        }
+                    }
+                } else {
+                    logger.warn("dailyGuides不是数组类型，实际类型: {}", dailyGuidesNode.getNodeType());
+                }
+            } else {
+                logger.warn("dailyGuides字段不存在或为空");
+            }
+            
+            planDTO.setDailyGuides(dailyGuides);
+            logger.info("最终解析的dailyGuides数量: {}", dailyGuides.size());
+
             return planDTO;
         } catch (Exception e) {
-            logger.error("解析AI响应失败: " + aiResponse, e);
+            logger.error("解析AI响应失败，原始响应内容: {}", aiResponse, e);
             // 如果解析失败，返回一个基本结构
             PlanSaveDTO planDTO = new PlanSaveDTO();
             planDTO.setDestination(request.getDestination());
@@ -277,6 +371,7 @@ public class AIServiceImpl implements AIService {
             planDTO.setBudget(BigDecimal.valueOf(request.getBudget()));
             planDTO.setSpots(new ArrayList<>());
             planDTO.setBudgets(new ArrayList<>());
+            planDTO.setDailyGuides(new ArrayList<>()); // 也要初始化dailyGuides
             return planDTO;
         }
     }
