@@ -51,6 +51,30 @@ public class PlanSaveDTO {
     private List<BudgetDTO> budgets;
 
     /**
+     * 每日路线指引列表
+     */
+    @Valid
+    private List<DailyGuideDTO> dailyGuides;
+
+    /**
+     * 每日路线指引DTO
+     */
+    @Data
+    public static class DailyGuideDTO {
+        /**
+         * 第几天（从1开始）
+         */
+        @NotNull(message = "天数不能为空")
+        private Integer dayNumber;
+
+        /**
+         * 路线指引文本（包含交通、住宿、景点、餐厅的推荐）
+         */
+        @NotBlank(message = "路线指引不能为空")
+        private String guide;
+    }
+
+    /**
      * 景点DTO
      */
     @Data

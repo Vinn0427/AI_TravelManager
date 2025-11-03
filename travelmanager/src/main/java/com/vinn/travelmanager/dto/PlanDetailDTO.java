@@ -21,6 +21,7 @@ public class PlanDetailDTO {
     private LocalDateTime createTime;
     private List<SpotDetailDTO> spots;
     private List<BudgetDetailDTO> budgets;
+    private List<DailyGuideDetailDTO> dailyGuides;
 
     @Data
     public static class SpotDetailDTO {
@@ -38,6 +39,14 @@ public class PlanDetailDTO {
         private Long id;
         private String category;
         private BigDecimal amount;
+        private LocalDateTime createTime;
+    }
+
+    @Data
+    public static class DailyGuideDetailDTO {
+        private Long id;
+        private Integer dayNumber;
+        private String guideText;
         private LocalDateTime createTime;
     }
 }

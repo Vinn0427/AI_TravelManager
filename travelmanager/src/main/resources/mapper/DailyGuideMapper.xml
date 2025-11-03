@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.vinn.travelmanager.mapper.DailyGuideMapper">
+
+  <resultMap id="DailyGuideResult" type="com.vinn.travelmanager.entity.DailyGuide">
+    <id property="id" column="id" />
+    <result property="userId" column="user_id" />
+    <result property="planId" column="plan_id" />
+    <result property="dayNumber" column="day_number" />
+    <result property="guideText" column="guide_text" />
+    <result property="createTime" column="create_time" />
+  </resultMap>
+
+  <insert id="insert" parameterType="com.vinn.travelmanager.entity.DailyGuide" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO dailyguide (user_id, plan_id, day_number, guide_text)
+    VALUES (#{userId}, #{planId}, #{dayNumber}, #{guideText})
+  </insert>
+
+  <insert id="batchInsert">
+    INSERT INTO dailyguide (user_id, plan_id, day_number, guide_text)
+    VALUES
+    <foreach collection="list" item="item" separator=",">
+      (#{item.userId}, #{item.planId}, #{item.dayNumber}, #{item.guideText})
+    </foreach>
+  </insert>
+
+  <select id="selectByPlanId" resultMap="DailyGuideResult">
+    SELECT id, user_id, plan_id, day_number, guide_text, create_time
+    FROM dailyguide
+    WHERE plan_id = #{planId}
+    ORDER BY day_number ASC, id ASC
+  </select>
+
+  <delete id="deleteByPlanId">
+    DELETE FROM dailyguide WHERE plan_id = #{planId}
+  </delete>
+
+</mapper>
+
+

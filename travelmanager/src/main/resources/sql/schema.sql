@@ -96,6 +96,24 @@ CREATE TABLE IF NOT EXISTS `user_preference` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户偏好表';
 
 -- ============================================
+-- 每日路线指引表 (DailyGuide)
+-- ============================================
+CREATE TABLE IF NOT EXISTS `dailyguide` (
+    `id` BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `user_id` BIGINT(20) NOT NULL COMMENT '用户ID',
+    `plan_id` BIGINT(20) NOT NULL COMMENT '计划ID',
+    `day_number` INT(11) NOT NULL COMMENT '第几天（从1开始）',
+    `guide_text` TEXT NOT NULL COMMENT '路线指引文本',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_plan_id` (`plan_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_day_number` (`day_number`),
+    CONSTRAINT `fk_dailyguide_plan` FOREIGN KEY (`plan_id`) REFERENCES `plan` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dailyguide_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日路线指引表';
+
+-- ============================================
 -- 说明：
 -- 1. 所有表都使用 utf8mb4 字符集，支持emoji等特殊字符
 -- 2. 所有表都包含 create_time 字段用于记录时间

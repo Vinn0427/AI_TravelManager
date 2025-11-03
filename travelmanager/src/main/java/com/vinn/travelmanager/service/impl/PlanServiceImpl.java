@@ -4,10 +4,12 @@ import com.vinn.travelmanager.dto.PlanDetailDTO;
 import com.vinn.travelmanager.dto.PlanSaveDTO;
 import com.vinn.travelmanager.entity.Budget;
 import com.vinn.travelmanager.entity.Plan;
+import com.vinn.travelmanager.entity.DailyGuide;
 import com.vinn.travelmanager.entity.Spot;
 import com.vinn.travelmanager.mapper.BudgetMapper;
 import com.vinn.travelmanager.mapper.PlanMapper;
 import com.vinn.travelmanager.mapper.SpotMapper;
+import com.vinn.travelmanager.mapper.DailyGuideMapper;
 import com.vinn.travelmanager.service.PlanService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,9 @@ public class PlanServiceImpl implements PlanService {
     @Autowired
     private BudgetMapper budgetMapper;
 
+    @Autowired
+    private DailyGuideMapper dailyGuideMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Plan savePlan(Long userId, PlanSaveDTO planSaveDTO) {
@@ -48,9 +53,10 @@ public class PlanServiceImpl implements PlanService {
             plan.setId(planSaveDTO.getId());
             planMapper.update(plan);
 
-            // 删除旧的景点和预算
+            // 删除旧的景点、预算与每日路线
             spotMapper.deleteByPlanId(planSaveDTO.getId());
             budgetMapper.deleteByPlanId(planSaveDTO.getId());
+            dailyGuideMapper.deleteByPlanId(planSaveDTO.getId());
         } else {
             // 新建计划
             planMapper.insert(plan);
@@ -95,6 +101,25 @@ public class PlanServiceImpl implements PlanService {
             }
         }
 
+        // 保存每日路线指引
+        if (planSaveDTO.getDailyGuides() != null && !planSaveDTO.getDailyGuides().isEmpty()) {
+            List<DailyGuide> guides = planSaveDTO.getDailyGuides().stream()
+                .filter(g -> g.getDayNumber() != null && g.getDayNumber() > 0 && g.getGuide() != null)
+                .map(g -> {
+                    DailyGuide dg = new DailyGuide();
+                    dg.setPlanId(planId);
+                    dg.setUserId(userId);
+                    dg.setDayNumber(g.getDayNumber());
+                    dg.setGuideText(g.getGuide());
+                    return dg;
+                })
+                .collect(Collectors.toList());
+
+            if (!guides.isEmpty()) {
+                dailyGuideMapper.batchInsert(guides);
+            }
+        }
+
         return planMapper.selectById(planId);
     }
 
@@ -129,6 +154,20 @@ public class PlanServiceImpl implements PlanService {
             })
             .collect(Collectors.toList());
         detailDTO.setBudgets(budgetDetails);
+
+        // 查询每日路线指引
+        List<DailyGuide> guides = dailyGuideMapper.selectByPlanId(id);
+        List<PlanDetailDTO.DailyGuideDetailDTO> guideDetails = guides.stream()
+            .map(g -> {
+                PlanDetailDTO.DailyGuideDetailDTO dto = new PlanDetailDTO.DailyGuideDetailDTO();
+                dto.setId(g.getId());
+                dto.setDayNumber(g.getDayNumber());
+                dto.setGuideText(g.getGuideText());
+                dto.setCreateTime(g.getCreateTime());
+                return dto;
+            })
+            .collect(Collectors.toList());
+        detailDTO.setDailyGuides(guideDetails);
 
         return detailDTO;
     }
