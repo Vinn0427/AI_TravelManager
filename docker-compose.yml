@@ -16,6 +16,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/travel?useSSL=false&serverTimezone=Asia/Shanghai
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: 123456
+      # MySQL 容器连接配置
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: travel
+      MYSQL_USER: root
       # 可选：Vite 构建 API Key（前端使用）
       VITE_MAP_API_KEY: ${VITE_MAP_API_KEY:-your_default_api_key}
     depends_on:
