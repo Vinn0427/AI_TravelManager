@@ -40,3 +40,4 @@ jobs:
       # Step 5: 登出
       - name: Logout
         run: docker logout ${{ secrets.ALIYUN_REGISTRY }}
+
