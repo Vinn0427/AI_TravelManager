@@ -12,7 +12,7 @@ spring:
     # url: 数据库连接地址，格式：jdbc:mysql://主机:端口/数据库名?参数
     # username: MySQL用户名（默认通常是root）
     # password: MySQL密码（请修改为您的实际密码）
-    url: jdbc:mysql://mysql:3306/travel_planner?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
+    url: jdbc:mysql://mysql:3306/travel?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
     username: root
     password: 123456
     hikari:
