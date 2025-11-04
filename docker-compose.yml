@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  # -----------------------------
+  # 1. SpringBoot + Vue 服务
+  # -----------------------------
+  app:
+    build:
+      context: .                # 当前目录作为构建上下文
+      dockerfile: Dockerfile
+    container_name: travelmanager-app
+    ports:
+      - "8080:8080"             # 暴露后端端口
+    environment:
+      # Spring Boot 数据库连接配置（与 MySQL 容器对应）
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/travel?useSSL=false&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+      # 可选：Vite 构建 API Key（前端使用）
+      VITE_MAP_API_KEY: ${VITE_MAP_API_KEY:-your_default_api_key}
+    depends_on:
+      - mysql
+    restart: always
+
+  # -----------------------------
+  # 2. MySQL 服务
+  # -----------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: travel
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-data:/var/lib/mysql   # 持久化数据库数据
+
+volumes:
+  mysql-data:
