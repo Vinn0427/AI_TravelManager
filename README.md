@@ -117,23 +117,6 @@ npm run dev
 - 预算分析 `BudgetAnalysis.vue`：类别汇总表 + 总额/计划数 + AI 文字评价。
 - 个人中心 `Profile.vue`：偏好设置（“美食/购物/文化/自然/历史/娱乐”），保存后用于规划页默认勾选。
 
-## 超时与性能
-
-- 后端 `RestTemplate`：连接 10s，读取 60s。
-- 前端 Axios：超时 60s，针对 AI 多天行程提供友好提示。
-- 模型选择：`qwen-turbo` 相对更快，减少超时概率。
-
-## 常见问题
-
-- Git 提交乱码：确保执行
-```
-git config --global i18n.commitencoding utf-8
-git config --global i18n.logoutputencoding utf-8
-```
-- DashScope 400 Bad Request：确认请求体包含 `input.messages` 与 `parameters`。
-- dailyGuides 不显示：确认 AI 返回 `dailyGuides` 数组且前端 `sortedDailyGuides` 为非空。
-- 地图不显示：确认加载了 API Key 且网络可访问高德地图资源。
-
 ## 许可
 
 此项目仅用于学习与演示用途。
