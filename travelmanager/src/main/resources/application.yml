@@ -12,9 +12,9 @@ spring:
     # url: 数据库连接地址，格式：jdbc:mysql://主机:端口/数据库名?参数
     # username: MySQL用户名（默认通常是root）
     # password: MySQL密码（请修改为您的实际密码）
-    url: jdbc:mysql://mysql:3306/travel?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
-    username: root
-    password: 123456
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:3306/${MYSQL_DATABASE:travel_planner}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123456}
     hikari:
       minimum-idle: 5
       maximum-pool-size: 20
@@ -22,6 +22,10 @@ spring:
       connection-timeout: 30000
       # 连接池配置
       pool-name: TravelPlannerHikariCP
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

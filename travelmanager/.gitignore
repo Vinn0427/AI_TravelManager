@@ -1,4 +1,6 @@
-# Maven
+########################################
+# ⚙️ Maven Build
+########################################
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -10,27 +12,35 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
-# IDE - IntelliJ IDEA
+########################################
+# 💻 IDEs
+########################################
+# IntelliJ IDEA
 .idea/
 *.iws
 *.iml
 *.ipr
 out/
 
-# IDE - Eclipse
+# Eclipse
 .classpath
 .project
 .settings/
 bin/
 
-# IDE - VS Code
+# VS Code
 .vscode/
 
-# Logs
+########################################
+# 🪵 Logs
+########################################
 *.log
 logs/
+spring.log
 
-# Package Files
+########################################
+# 📦 Build / Package Files
+########################################
 *.jar
 *.war
 *.nar
@@ -39,11 +49,16 @@ logs/
 *.tar.gz
 *.rar
 
-# OS
+########################################
+# 💽 Operating System
+########################################
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Node.js (Frontend)
+########################################
+# 🌐 Node.js (Frontend)
+########################################
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
@@ -53,16 +68,48 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/pnpm-debug.log*
 
-# Environment variables
+########################################
+# 🔐 Environment Variables
+########################################
 .env
 .env.local
 .env.*.local
 
-# Database
+########################################
+# 🗃️ Database
+########################################
+# Local MySQL data directory (runtime files)
+mysql-data/
+# Socket / temporary files
+*.sock
+*.pid
 *.db
 *.sqlite
+*.sql.bak
 
-# Application specific
+########################################
+# 🐳 Docker
+########################################
+# Build cache / intermediate containers
+docker-compose.override.yml
+.docker/
+*.tar
+*.bak
+*.tmp
+*~ 
+
+########################################
+# ⚙️ Application Specific Config
+########################################
 application-local.yml
 application-*.properties
+!application-prod.properties   # ✅ 保留生产配置（如有需要）
 
+########################################
+# 🧪 Others
+########################################
+# Temporary / generated files
+tmp/
+*.swp
+*.swo
+*.bak
